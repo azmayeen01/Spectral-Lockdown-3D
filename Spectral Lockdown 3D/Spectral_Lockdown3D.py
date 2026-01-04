@@ -77,7 +77,66 @@ GAME_OVER = False
 GAME_WIN = False
 GAME_MESSAGE = ""
 
-# ============= NaziaNissa - MAP / COLLISION =============
+def init_game_state():
+    global GAME_OVER, GAME_WIN, GAME_MESSAGE, PLAYER_HEALTH, LAST_FRAME_TIME, DT, PLAYER_ROT, camera_mode, SLOW_T, FREEZE_T, HURT_CD, GAME_ITEMS, ALTARS, INVENTORY, FINAL_PHASE_ACTIVE, FINAL_PHASE_TIMER, FINAL_WARDEN_BANISHED, WARDEN, WARDEN_VISIBLE, FINAL_START_TIME, KEYS, CHEAT_FREEZE_GHOSTS
+    CHEAT_FREEZE_GHOSTS = False
+    GAME_OVER = False
+    GAME_WIN = False
+    GAME_MESSAGE = ""
+    PLAYER_HEALTH = 5
+    PLAYER_ROT = 90.0
+    KEYS["w"] = False; KEYS["s"] = False; KEYS["a"] = False; KEYS["d"] = False
+    camera_mode = CAM_MODE_FPS
+    SLOW_T, FREEZE_T, HURT_CD = 0.0, 0.0, 0.0   
+    GAME_ITEMS = []
+    ALTARS = {}
+    INVENTORY = set()
+    FINAL_PHASE_ACTIVE = False
+    FINAL_PHASE_TIMER = 0.0
+    FINAL_WARDEN_BANISHED = False
+    WARDEN = None
+    WARDEN_VISIBLE = False
+    FINAL_START_TIME = now_seconds()
+
+    globals()["SHADOW_ROOM_ID"] = None
+    globals()["SHADOW_ROOM_ACTIVE"] = False
+    globals()["SHADOW_ROOM_DONE"] = False
+    globals()["SHADOW_ROOM_TIMER"] = 0.0
+    if "SHADOW_REQUIRED_T" not in globals():
+        globals()["SHADOW_REQUIRED_T"] = 2.5
+
+    # Reset frame timing so DT doesn't jump on first frame after restart
+    LAST_FRAME_TIME = 0.0
+    DT = 0.016
+    if "EXIT_SIDE" not in globals():
+        globals()["EXIT_SIDE"] = "L"
+    build_mansion_layout()
+    world_spawns_define_points()
+
+    ROOM_STATE.clear()
+    for rid in ROOMS.keys():
+        ROOM_STATE[rid] = "HAUNTED"
+
+    if "stem" in HALL:
+        x0, x1, y0, y1 = HALL["stem"]
+        PLAYER_POS[0] = 0.5 * (x0 + x1)
+        PLAYER_POS[1] = y0 + 160.0
+    else:
+        PLAYER_POS[0] = 0.0
+        PLAYER_POS[1] = 0.0
+    LAST_VALID_POS[0] = PLAYER_POS[0]
+    LAST_VALID_POS[1] = PLAYER_POS[1]
+    define_room_triggers()
+    globals()["PLAYER_ZONE"] = get_player_zone(PLAYER_POS[0], PLAYER_POS[1])
+    globals()["PLAYER_LAST_MOVE_T"] = now_seconds()
+    spawn_ghosts_initial()
+    spawn_items_and_mechanisms()
+
+def reset_run():
+    init_game_state()
+    glutPostRedisplay()
+
+# ============= (3) Member 1 - MAP / COLLISION =============
 Z_FLOOR = 0.00; Z_STRIPES = 0.03; Z_OVERLAY = 0.06; Z_SKIRT = 0.09
 EXIT_SIDE = "R"   # "L" or "R"
 
@@ -973,3 +1032,371 @@ def draw_room_state_feedback():
         glVertex3f(x + s, y + s, Z_OVERLAY)
         glVertex3f(x - s, y + s, Z_OVERLAY)
         glEnd()
+
+# ============= (5) Member 3 — (STUBS until member 3 commit) =============
+def banish_interaction_logic(reach=110.0):
+    return False
+
+def try_pickup_nearby_item(reach=90.0):
+    return False
+
+def try_exit_interaction(reach=120.0):
+    return False
+
+def spawn_ghosts_initial():
+    return
+
+def spawn_items_and_mechanisms():
+    return
+
+def ghost_state_machine_update():
+    return
+
+def update_warden_ai():
+    return
+
+def apply_ghost_effects_on_contact():
+    return
+
+def room_clear_progression_update():
+    return
+
+def shadow_room_update():
+    return
+
+def spawn_final_warden_if_ready():
+    return
+
+def final_phase_timer_update():
+    return
+
+def draw_items_and_mechanisms():
+    return
+
+def draw_ghosts():
+    return
+
+# ============= (4) Member 2 — PLAYER CONTROL / CAMERA / STATUS EFFECTS / CHEAT =============
+PLAYER_LAST_MOVE_T = 0.0
+
+def banish_try_interaction(reach=110.0):
+    return banish_interaction_logic(reach=reach)
+
+def do_interact_action():
+    if try_exit_interaction():
+        return True
+    if banish_try_interaction():
+        return True
+    if try_pickup_nearby_item():
+        return True
+    return try_toggle_nearby_door(PLAYER_POS[0], PLAYER_POS[1])
+
+def handle_keyboard_input(key, x, y):
+    global camera_mode, CHEAT_FREEZE_GHOSTS, GAME_MESSAGE
+    if key == b'w': KEYS["w"] = True
+    if key == b's': KEYS["s"] = True
+    if key == b'a': KEYS["a"] = True
+    if key == b'd': KEYS["d"] = True
+    if key == b'e' or key == b'E':
+        do_interact_action()
+        return
+    if key == b'v' or key == b'V':
+        CHEAT_FREEZE_GHOSTS = not CHEAT_FREEZE_GHOSTS
+        if CHEAT_FREEZE_GHOSTS:
+            GAME_MESSAGE = "CHEAT: Ghosts frozen"
+        else:
+            GAME_MESSAGE = "CHEAT: Ghosts unfrozen"
+        return
+    if key == b'c' or key == b'C':
+        camera_mode = CAM_MODE_TPS if camera_mode == CAM_MODE_FPS else CAM_MODE_FPS
+
+def handle_keyboard_up(key, x, y):
+    if key == b'w': KEYS["w"] = False
+    if key == b's': KEYS["s"] = False
+    if key == b'a': KEYS["a"] = False
+    if key == b'd': KEYS["d"] = False
+
+def handle_special_keys(key, x, y):
+    global PLAYER_ROT, TPS_BACK, TPS_UP
+    if key == GLUT_KEY_LEFT:
+        PLAYER_ROT += 4.0
+    elif key == GLUT_KEY_RIGHT:
+        PLAYER_ROT -= 4.0
+    elif key == GLUT_KEY_UP:
+        TPS_BACK = clamp_value(TPS_BACK - 10.0, 90.0, 220.0)
+    elif key == GLUT_KEY_DOWN:
+        TPS_BACK = clamp_value(TPS_BACK + 10.0, 90.0, 260.0)
+
+def handle_mouse_input(button, state, x, y):
+    global camera_mode
+    if state != GLUT_DOWN:
+        return
+    # Right click toggles camera mode
+    if button == GLUT_RIGHT_BUTTON:
+        camera_mode = CAM_MODE_TPS if camera_mode == CAM_MODE_FPS else CAM_MODE_FPS
+        return
+    # Left click: quick interact (same priority as E)
+    if button == GLUT_LEFT_BUTTON:
+        do_interact_action()
+        return
+
+def update_player_movement():
+    global PLAYER_POS
+    if GAME_OVER or GAME_WIN:
+        return
+    if FREEZE_T > 0.0:
+        return
+    fx, fy = forward_xy(PLAYER_ROT)
+    rx, ry = fy, -fx
+    sp = PLAYER_SPEED
+    if SLOW_T > 0.0:
+        sp *= 0.45
+    dx = 0.0
+    dy = 0.0
+    w = KEYS["w"]
+    s = KEYS["s"]
+    a = KEYS["a"]
+    d = KEYS["d"]
+    if w:
+        dx += fx * sp
+        dy += fy * sp
+    if s:
+        dx -= fx * sp
+        dy -= fy * sp
+    if a:
+        dx -= rx * sp
+        dy -= ry * sp
+    if d:
+        dx += rx * sp
+        dy += ry * sp
+    PLAYER_POS[0] += dx * DT
+    PLAYER_POS[1] += dy * DT
+
+def camera_setup():
+    glMatrixMode(GL_PROJECTION)
+    glLoadIdentity()
+    aspect = float(w_width) / float(w_height)
+    far_plane = max(2000.0, 8.0 * g_length)
+    gluPerspective(fovY, aspect, 0.1, far_plane)
+    glMatrixMode(GL_MODELVIEW)
+    glLoadIdentity()
+    px, py = PLAYER_POS[0], PLAYER_POS[1]
+    fx, fy = forward_xy(PLAYER_ROT)
+    if camera_mode == CAM_MODE_FPS:
+        eye = (px, py, FPS_EYE_Z)
+        look = (px + fx * FPS_LOOK_DIST, py + fy * FPS_LOOK_DIST, FPS_EYE_Z - 10.0)
+        gluLookAt(eye[0], eye[1], eye[2],
+                  look[0], look[1], look[2],
+                  0, 0, 1)
+        return
+    # TPS camera with simple bounds clamp (prevents "inside wall" look most of the time)
+    desired_cx = px - fx * TPS_BACK
+    desired_cy = py - fy * TPS_BACK
+    desired_cz = TPS_UP
+    # Clamp camera position to mansion bounds (if available)
+    if BOUNDS:
+        mx0, mx1, my0, my1 = BOUNDS
+        pad = 40.0
+        desired_cx = clamp_value(desired_cx, mx0 + pad, mx1 - pad)
+        desired_cy = clamp_value(desired_cy, my0 + pad, my1 - pad)
+    lookz = 55.0
+    gluLookAt(desired_cx, desired_cy, desired_cz,
+              px + fx * 40.0, py + fy * 40.0, lookz,
+              0, 0, 1)
+
+def camera_mode_rules():
+    global TPS_BACK, TPS_UP
+    TPS_BACK = clamp_value(TPS_BACK, 90.0, 260.0)
+    TPS_UP   = clamp_value(TPS_UP, 60.0, 160.0)
+def player_status_effect_system():
+    global SLOW_T, FREEZE_T, HURT_CD, GAME_MESSAGE
+    if SLOW_T > 0.0:
+        SLOW_T = max(0.0, SLOW_T - DT)
+    if FREEZE_T > 0.0:
+        FREEZE_T = max(0.0, FREEZE_T - DT)
+    if HURT_CD > 0.0:
+        HURT_CD = max(0.0, HURT_CD - DT)
+    if GAME_MESSAGE and random.random() < 0.02:
+        GAME_MESSAGE = ""
+
+def draw_player_model_tps():
+    if camera_mode != CAM_MODE_TPS:
+        return
+    glPushMatrix()
+    glTranslatef(PLAYER_POS[0], PLAYER_POS[1], 0.0)
+    glRotatef(PLAYER_ROT, 0, 0, 1)
+    # --- Reference body proportions ---
+    leg_len = 30.0
+    leg_top_z = leg_len
+    leg_top_r = 9.0
+    leg_bot_r = 4.0
+    torso_w = 45.0
+    torso_d = 25.0
+    torso_h = 65.0
+    torso_gap = 6.0
+    torso_cz = leg_top_z + torso_gap + (torso_h * 0.5)
+    head_r = 15.0
+    head_cz = torso_cz + (torso_h * 0.5) + 18.0
+    # Torso
+    glColor3f(0.0, 0.5, 0.0)
+    glPushMatrix()
+    glTranslatef(0, 0, torso_cz)
+    glScalef(torso_w, torso_d, torso_h)
+    glutSolidCube(1)
+    glPopMatrix()
+    # Head
+    glColor3f(0, 0, 0)
+    glPushMatrix()
+    glTranslatef(0, 0, head_cz)
+    gluSphere(quad, head_r, 16, 16)
+    glPopMatrix()
+    glColor3f(1.0, 0.8, 0.6)
+    shoulder_z = torso_cz + 12.0
+    arm_x = 18.0
+    arm_y = 6.0
+    arm_len = 34.0
+    for side in (-1, 1):
+        glPushMatrix()
+        glTranslatef(side * arm_x, arm_y, shoulder_z)
+        glRotatef(180, 1, 0, 0)
+        gluCylinder(quad, 5, 5, arm_len, 10, 10)
+        glPopMatrix()
+    # Legs
+    glColor3f(0, 0, 1)
+    leg_x = 14.0
+    for side in (-1, 1):
+        glPushMatrix()
+        glTranslatef(side * leg_x, 0, leg_top_z)
+        glRotatef(180, 1, 0, 0)
+        gluCylinder(quad, leg_top_r, leg_bot_r, leg_len, 10, 10)
+        glPopMatrix()
+    glPopMatrix()
+
+# ============= HUD and TEXT =============
+def draw_text(x, y, text, font=GLUT_BITMAP_HELVETICA_18):
+    glColor3f(1, 1, 1)
+    glMatrixMode(GL_PROJECTION)
+    glPushMatrix()
+    glLoadIdentity()
+    gluOrtho2D(0, w_width, 0, w_height)
+    glMatrixMode(GL_MODELVIEW)
+    glPushMatrix()
+    glLoadIdentity()
+    glRasterPos2f(x, y)
+    for ch in str(text):
+        glutBitmapCharacter(font, ord(ch))
+    glPopMatrix()
+    glMatrixMode(GL_PROJECTION)
+    glPopMatrix()
+    glMatrixMode(GL_MODELVIEW)
+
+def draw_hud_overlay():
+    draw_text(10, w_height - 20, f"HP: {PLAYER_HEALTH}")
+    zt, zid = get_player_zone(PLAYER_POS[0], PLAYER_POS[1])
+    if zt == "hall":
+        zone_str = "Hallway"
+    elif zt == "room":
+        zone_str = f"Room {zid}"
+    else:
+        zone_str = zt
+    draw_text(10, w_height - 40, f"Zone: {zone_str}")
+    if CHEAT_FREEZE_GHOSTS:
+        draw_text(10, w_height - 80, "CHEAT: FREEZE (V)")
+    # Status effects (show remaining seconds)
+    y = w_height - 60
+    if SLOW_T > 0.0:
+        draw_text(10, y, f"SLOW: {SLOW_T:.1f}s"); y -= 20
+    if FREEZE_T > 0.0:
+        draw_text(10, y, f"FREEZE: {FREEZE_T:.1f}s"); y -= 20
+    if FINAL_PHASE_ACTIVE:
+        draw_text(10, y, f"FINAL TIMER: {max(0, int(FINAL_PHASE_TIMER))}"); y -= 20
+    if GAME_OVER:
+        draw_text(w_width * 0.40, w_height * 0.55, "GAME OVER")
+    if GAME_WIN:
+        draw_text(w_width * 0.42, w_height * 0.55, "YOU WIN")
+    if GAME_MESSAGE:
+        draw_text(10, 20, GAME_MESSAGE)
+
+# ============= (7) UPDATE LOOP (Idle) =============
+def update_game():
+    global LAST_FRAME_TIME, DT
+    t = now_seconds()
+    if LAST_FRAME_TIME <= 0.0:
+        LAST_FRAME_TIME = t
+    DT = t - LAST_FRAME_TIME
+    LAST_FRAME_TIME = t
+    DT = clamp_value(DT, 0.001, 0.05)
+    player_status_effect_system()
+    update_player_movement()
+    collision_resolve_player_world()
+    define_room_triggers()
+    globals()["PLAYER_ZONE"] = get_player_zone(PLAYER_POS[0], PLAYER_POS[1])
+    door_lock_unlock_system()
+    ghost_state_machine_update()
+    update_warden_ai()
+    apply_ghost_effects_on_contact()
+    room_clear_progression_update()
+    shadow_room_update()
+    spawn_final_warden_if_ready()
+    final_phase_timer_update()
+    camera_mode_rules()
+
+def idle():
+    update_game()
+    glutPostRedisplay()
+
+# ============= (8) DRAW LOOP (showScreen) — Draw in consistent order =============
+def showScreen():
+    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT)
+    glLoadIdentity()
+    glViewport(0, 0, w_width, w_height)
+    setupCamera()
+    draw_world_floor_and_walls()
+    draw_room_state_feedback()
+    draw_items_and_mechanisms()
+    draw_ghosts()
+    draw_player_model_tps()
+    draw_hud_overlay()
+    glutSwapBuffers()
+
+# ============= LISTENERS =============
+
+def keyboardListener(key, x, y):
+    if key == b'r' or key == b'R':
+        reset_run()
+        return
+    handle_keyboard_input(key, x, y)
+    glutPostRedisplay()
+
+def specialKeyListener(key, x, y):
+    handle_special_keys(key, x, y)
+    glutPostRedisplay()
+
+def mouseListener(button, state, x, y):
+    handle_mouse_input(button, state, x, y)
+    glutPostRedisplay()
+
+# ============= CAMERA =============
+def setupCamera():
+    camera_setup()
+# ============= MAIN =============
+def main():
+    global quad
+    glutInit()
+    glutInitDisplayMode(GLUT_DOUBLE | GLUT_RGB | GLUT_DEPTH)
+    glutInitWindowSize(w_width, w_height)
+    glutInitWindowPosition(0, 0)
+    glutCreateWindow(b"Spectral Lockdown 3D")
+    quad = gluNewQuadric()
+    glEnable(GL_DEPTH_TEST)
+    init_game_state()
+    glutDisplayFunc(showScreen)
+    glutKeyboardFunc(keyboardListener)
+    glutKeyboardUpFunc(handle_keyboard_up)
+    glutSpecialFunc(specialKeyListener)
+    glutMouseFunc(mouseListener)
+    glutIdleFunc(idle)
+    glutMainLoop()
+
+if __name__ == "__main__":
+    main()
