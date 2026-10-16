@@ -8,7 +8,7 @@ Built as the team project for **CSE423: Computer Graphics** at BRAC University (
 
 ## Gameplay
 
-The mansion is a central hallway leading to a top corridor, with four rooms on either side.
+The mansion is a central hallway leading to a top corridor, with two rooms on each side.
 
 1. **Explore and collect.** Find the **Charm Item** in Room 2, a **Health Orb** in Room 3, and a **Time Shard** in Room 4. Room 4's door stays locked until you hold the Charm.
 2. **Banish the ghosts.**
